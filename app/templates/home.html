@@ -47,11 +47,12 @@
 </head>
 <body>
     <div class="container mt-5">
-        <div>
-            <img src="{{ url_for('static', filename='mistral-ai-logo.png') }}" alt="Mistral AI Logo" style="height: 100px;"/>
-
+        <div class="text-center"> 
+            <img src="{{ url_for('static', filename='mistral-ai-logo.png') }}" alt="Mistral AI Logo" style="height: 320px;"/>
         </div>
-        <h1 class="mb-4">Mistral AI Assistant with Flask - A Simple Example With Code</h1>
+        <h1>
+            Assistant with Flask - A Simple Example With Code
+        </h1>
         <div>
             <form id="messageForm" onsubmit="handleSubmit(event)" class="mb-3">
                 <div class="form-group">
