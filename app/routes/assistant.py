@@ -1,4 +1,4 @@
-from flask import render_template, Blueprint, request, jsonify
+from flask import render_template, Blueprint, request, jsonify, current_app
 from app.services.assistant import AssistantService
 
 assistant_bp = Blueprint('assistant', __name__)
@@ -6,6 +6,7 @@ assistant_bp = Blueprint('assistant', __name__)
 @assistant_bp.route('/assistant', methods=['GET', 'POST'])
 def assistant():
     if request.method == 'POST':
+        current_app.logger.info('POST request received')
         # Extract message from the POST request
         data = request.get_json()
         message = data.get('message', '')

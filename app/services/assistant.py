@@ -8,7 +8,7 @@ from mistralai.client import MistralClient
 class AssistantService:
     def __init__(self):
         current_app.logger.info(Config.MISTRALAI_KEY)
-        self.client = MistralClient(api_key="2h2ssQ5NarqXAlpFxjdxMjvrXsCr1qEL")
+        self.client = MistralClient(api_key=Config.MISTRALAI_KEY)
 
         self.assistant_name = 'IT Administrator Assistant'
         self.model_id= 'mistral-large-latest'
@@ -23,9 +23,9 @@ class AssistantService:
             model=self.model_id,
             messages=self.discussion,
             tools=[
-                self.define_function__get_permissions_by_username(), 
-                self.define_function__get_user_id_by_username(), 
-                self.define_function__update_user_permission()
+                self.define_function__list_available_zones(), 
+                self.define_function__list_device_status_by_zone(), 
+                self.define_function__update_zone_device_status()
             ],
             tool_choice="auto"
         )
@@ -39,15 +39,10 @@ class AssistantService:
         if tool_calls:
             current_app.logger.info(f'Tool calls found: {tool_calls}')
             self.generate_tool_outputs(tool_calls)
+            current_app.logger.info(f'Discussion after tool call: {self.discussion}')
             ai_response = self.client.chat(
                 model=self.model_id,
-                messages=self.discussion,
-                tools=[
-                self.define_function__get_permissions_by_username(), 
-                self.define_function__get_user_id_by_username(), 
-                self.define_function__update_user_permission()
-                ],
-                tool_choice="auto"
+                messages=self.discussion
             )
             current_app.logger.info(f'Assistant response after tool call: {ai_response.choices[0].message}')
             self.discussion.append(ChatMessage(role="assistant", content=ai_response.choices[0].message.content))
@@ -73,88 +68,79 @@ class AssistantService:
 
         return tool_outputs
     
-    def define_function__get_user_id_by_username(self):
+    def define_function__list_available_zones(self):
         function = {
             "type": "function",
             "function": {
-                "name": "getUserIdByUsername",
-                "description": "Get the user ID based on the username.",
+                "name": "list_available_zones",
+                "description": "List the available zones of the house.",
+                "parameters": {
+                    "type": "object"
+                }
+            }
+        }
+        return function
+    
+    def define_function__list_device_status_by_zone(self):
+        function = {
+            "type": "function",
+            "function": {
+                "name": "list_device_status_by_zone",
+                "description": "List the status of devices in a specific zone.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "username": {"type": "string", "description": "The username of the user."}
+                        "zone": {"type": "string", "description": "The zone to list the device status for. Can be 'kitchen' or 'outdoor'."}
                     },
-                    "required": ["username"]
+                    "required": ["zone"]
                 }
             }
         }
         return function
     
-    def define_function__get_permissions_by_username(self):
+    def define_function__update_zone_device_status(self):
         function = {
             "type": "function",
             "function": {
-                "name": "getPermissionsByUsername",
-                "description": "Get the permissions of a user by their username.",
+                "name": "update_zone_status",
+                "description": "Update the status of a device in a specific zone.",
                 "parameters": {
                 "type": "object",
                 "properties": {
-                    "username": {"type": "string", "description": "The username of the user."}
+                    "zone": {"type": "string", "description": "The zone to update the status for. Can be 'kitchen' or 'outdoor'."},
+                    "device": {"type": "string", "description": "The device to update the status for. Can be 'light', 'door', or 'camera'."},
                 },
-                "required": ["username"]
+                "required": ["zone", "device"]
                 }
             }
         }
         return function
     
-    def define_function__update_user_permission(self):
-        function = {
-            "type": "function",
-            "function": {
-                "name": "updateUserPermission",
-                "description": "Update the value of a permission for a user by their username.",
-                "parameters": {
-                "type": "object",
-                "properties": {
-                    "username": {"type": "string", "description": "The username of the user."},
-                    "permission": {"type": "string", "description": "The permission to update."},
-                    "value": {"type": "boolean", "description": "The new value of the permission."}
-                },
-                "required": ["username"]
-                }
-            }
-        }
-        return function
-    
-    def getUserIdByUsername(self, username):
-        current_app.logger.info(f'getUserIdByUsername: {username}')
-        user_id = current_app.permissions_service.get_user_id_by_username(username)
-        if user_id:
-            current_app.logger.info(f'User found with id: {user_id}')
-            return user_id
+    def list_available_zones(self):
+        current_app.logger.info(f'list_available_zones')
+        available_zones = current_app.domotics_service.list_available_zones()
+        if available_zones:
+            current_app.logger.info(f'Available zones found with ref: {available_zones}')
+            return json.dumps(available_zones)
         else:
-            current_app.logger.info('User not found')
-            return "No user found"
+            current_app.logger.info('No available zones found')
+            return "No available zone found"
     
-    def getPermissionsByUsername(self, username):
-        current_app.logger.info(f'getPermissionsByUsername: {username}')
-        user_id = current_app.permissions_service.get_user_id_by_username(username)
-        if user_id:
-            current_app.logger.info(f'User found with id: {user_id}')
-            permissions = current_app.permissions_service.get_permissions_by_user_id(user_id)
-            current_app.logger.info(permissions)
-            return permissions
-        current_app.logger.info('User not found')
-        return "No user found"
+    def list_device_status_by_zone(self, zone):
+        current_app.logger.info(f'list_device_status_by_zone: {zone}')
+        devices = current_app.domotics_service.list_device_status_by_zone(zone)
+        if devices:
+            current_app.logger.info(f'Devices found')
+            return json.dumps(devices)
+        current_app.logger.info('No devices found')
+        return "No device found"
     
-    def updateUserPermission(self, username, permission, value):
-        current_app.logger.info(f'updateUserPermission: {username}, {permission}, {value}')
-        user_id = current_app.permissions_service.get_user_id_by_username(username)
-        if user_id:
-            current_app.logger.info(f'User found with id: {user_id}')
-            updated_permission = current_app.permissions_service.update_user_permission(user_id, permission, value)
-            current_app.logger.info(updated_permission) 
-            return updated_permission
+    def update_zone_status(self, zone, device):
+        current_app.logger.info(f'update_zone_status: {zone}, {device}')
+        updated_status = current_app.domotics_service.update_zone_status(zone, device)
+        if updated_status:
+            current_app.logger.info(updated_status) 
+            return json.dumps(updated_status)
         else:
-            current_app.logger.info('User not found')
-            return "No user found"
+            current_app.logger.info('Zone or device not found')
+            return "Zone or device not found"
